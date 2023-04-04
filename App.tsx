@@ -49,6 +49,15 @@ import {
 } from './features/tasks/tasksSlice';
 import type { RootState } from './app/store';
 
+const defaultTask: Task = {
+  title: '',
+  description: '',
+  deadline: dayjs().add(1, 'day').toJSON(),
+  priority: 'low',
+  isComplete: false,
+  action: ['update', 'delete'],
+};
+
 // components
 interface UpdateDialogProps {
   task: Task;
@@ -206,16 +215,6 @@ function ActionField({ task }: UpdateDialogProps) {
 export default function App() {
   // Dialog States
   const [openDialog, setOpenDialog] = React.useState<boolean>(false);
-  // new task states
-  const [title, setTitle] = React.useState('');
-  const [desc, setDesc] = React.useState('');
-  const [deadline, setDeadline] = React.useState<string>(
-    dayjs().add(1, 'day').toJSON()
-  );
-  const [priority, setPriority] = React.useState('low');
-
-  const [titleError, setTitleError] = React.useState(true);
-  const [descError, setDescError] = React.useState(true);
 
   // redux state management
   const tasks = useSelector((state: RootState) => state.tasks.tasks);
@@ -224,47 +223,8 @@ export default function App() {
   // Snackbar (toaster)
   const [snackbar, setSnackbar] = React.useState(false);
 
-  // form dialog functions
-  const resetInputs = () => {
-    setTitle('');
-    setDesc('');
-    setDeadline(dayjs());
-    setPriority('low');
-  };
-
   const handleClickOpenDialog = () => {
     setOpenDialog(true);
-  };
-
-  const handleCloseDialog = () => {
-    resetInputs();
-    setOpenDialog(false);
-  };
-
-  const handleSubmitCloseDialog = () => {
-    if (title.length > 0 && desc.length > 0) {
-      const newTask: Task = {
-        title: title,
-        description: desc,
-        deadline: deadline,
-        priority: priority,
-        isComplete: false,
-        action: ['update', 'delete'],
-      };
-      dispatch(addTask(newTask));
-      resetInputs();
-      setOpenDialog(false);
-      setSnackbar(true);
-      setTimeout(() => {
-        setSnackbar(false); // set the open state to false after 2 seconds
-      }, 2000);
-    }
-    if (title === '') {
-      setTitleError(true);
-    }
-    if (desc === '') {
-      setDescError(true);
-    }
   };
 
   const handleSnackbarClose = (
@@ -290,15 +250,6 @@ export default function App() {
       </IconButton>
     </React.Fragment>
   );
-
-  // need alert for deadline
-  const handleDeadlineChange = (newValue: Dayjs | null) => {
-    if (newValue.isAfter(dayjs().add(1, 'day'))) {
-      setDeadline(newValue.toJSON());
-    } else {
-      // do something
-    }
-  };
 
   // Rendering
   return (
@@ -326,100 +277,12 @@ export default function App() {
           >
             Add
           </Button>
-
-          {/* Add Form Dialog */}
-          <Dialog open={openDialog} onClose={handleCloseDialog}>
-            <DialogTitle>
-              <IconButton>
-                <AddCircleRoundedIcon />
-              </IconButton>
-              Add Task
-            </DialogTitle>
-            <DialogContent>
-              <Stack spacing={2}>
-                <TextField
-                  autoFocus
-                  margin="normal"
-                  id="title"
-                  label="Title"
-                  type="text"
-                  variant="standard"
-                  value={title}
-                  onChange={(e) => {
-                    setTitle(e.target.value);
-                    setTitleError(false);
-                  }}
-                  sx={{ gap: 2 }}
-                  required
-                  error={titleError}
-                  helperText={titleError ? 'required' : ''}
-                />
-                <TextField
-                  autoFocus
-                  margin="normal"
-                  id="description"
-                  label="Description"
-                  type="text"
-                  variant="standard"
-                  value={desc}
-                  onChange={(e) => {
-                    setDesc(e.target.value);
-                    setDescError(false);
-                  }}
-                  required
-                  error={descError}
-                  helperText={descError ? 'required' : ''}
-                />
-                <LocalizationProvider dateAdapter={AdapterDayjs}>
-                  <DesktopDatePicker
-                    label="Deadline"
-                    inputFormat="MM/DD/YYYY"
-                    value={dayjs(deadline)}
-                    onChange={handleDeadlineChange}
-                    renderInput={(params) => <TextField {...params} />}
-                  />
-                </LocalizationProvider>
-                <FormControl>
-                  <FormLabel id="priority-label">Priority</FormLabel>
-                  <RadioGroup
-                    row
-                    aria-labelledby="priority-label"
-                    name="row-radio-buttons-group"
-                    defaultValue={priority}
-                    value={priority}
-                    onChange={(e) => setPriority(e.target.value)}
-                  >
-                    <FormControlLabel
-                      value="low"
-                      control={<Radio />}
-                      label="Low"
-                    />
-                    <FormControlLabel
-                      value="medium"
-                      control={<Radio />}
-                      label="Medium"
-                    />
-                    <FormControlLabel
-                      value="high"
-                      control={<Radio />}
-                      label="High"
-                    />
-                  </RadioGroup>
-                </FormControl>
-              </Stack>
-            </DialogContent>
-            <DialogActions>
-              <Button
-                startIcon={<AddCircleRoundedIcon />}
-                onClick={handleSubmitCloseDialog}
-              >
-                Add
-              </Button>
-              <Button startIcon={<BlockIcon />} onClick={handleCloseDialog}>
-                Cancel
-              </Button>
-            </DialogActions>
-          </Dialog>
+          <ReusableDialog
+            task={defaultTask}
+            openDialog={openDialog}
+            setOpenDialog={setOpenDialog}
+            isAdd={true}
+          />
         </Toolbar>
       </AppBar>
       {/* Table Data */}
@@ -503,13 +366,163 @@ interface ReusableDialogProps {
   task: Task;
   openDialog: boolean;
   setOpenDialog: (openDialog: boolean) => void;
+  isAdd: boolean;
 }
 
-const defaultTask: Task = {
-  title: '',
-  description: '',
-  deadline: dayjs().add(1, 'day').toJSON(),
-  priority: 'low',
-  isComplete: false,
-  action: ['update', 'delete'],
-};
+function ReusableDialog({
+  task,
+  openDialog,
+  setOpenDialog,
+  isAdd,
+}: ReusableDialogProps) {
+  // new task states
+  const [title, setTitle] = React.useState(task.title);
+  const [desc, setDesc] = React.useState(task.description);
+  const [deadline, setDeadline] = React.useState<string>(task.deadline);
+  const [priority, setPriority] = React.useState(task.priority);
+
+  const [titleError, setTitleError] = React.useState(true);
+  const [descError, setDescError] = React.useState(true);
+
+  const dispatch = useDispatch();
+
+  // Snackbar (toaster)
+  const [snackbar, setSnackbar] = React.useState(false);
+
+  // form dialog functions
+  const resetInputs = () => {
+    setTitle('');
+    setDesc('');
+    setDeadline(dayjs());
+    setPriority('low');
+  };
+
+  const handleCloseDialog = () => {
+    resetInputs();
+    setOpenDialog(false);
+  };
+
+  const handleSubmitCloseDialog = () => {
+    if (title.length > 0 && desc.length > 0) {
+      const newTask: Task = {
+        title: title,
+        description: desc,
+        deadline: deadline,
+        priority: priority,
+        isComplete: task.isComplete,
+        action: task.action,
+      };
+      if (isAdd) {
+        dispatch(addTask(newTask));
+        resetInputs();
+      }
+      setOpenDialog(false);
+      setSnackbar(true);
+      setTimeout(() => {
+        setSnackbar(false); // set the open state to false after 2 seconds
+      }, 2000);
+    }
+    if (title === '') {
+      setTitleError(true);
+    }
+    if (desc === '') {
+      setDescError(true);
+    }
+  };
+
+  // need alert for deadline
+  const handleDeadlineChange = (newValue: Dayjs | null) => {
+    if (newValue.isAfter(dayjs().add(1, 'day'))) {
+      setDeadline(newValue.toJSON());
+    } else {
+      // do something
+    }
+  };
+
+  return (
+    <Dialog open={openDialog} onClose={handleCloseDialog}>
+      <DialogTitle>
+        <IconButton>
+          <AddCircleRoundedIcon />
+        </IconButton>
+        Add Task
+      </DialogTitle>
+      <DialogContent>
+        <Stack spacing={2}>
+          <TextField
+            autoFocus
+            margin="normal"
+            id="title"
+            label="Title"
+            type="text"
+            variant="standard"
+            value={title}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              setTitleError(false);
+            }}
+            sx={{ gap: 2 }}
+            required
+            error={titleError}
+            helperText={titleError ? 'required' : ''}
+          />
+          <TextField
+            autoFocus
+            margin="normal"
+            id="description"
+            label="Description"
+            type="text"
+            variant="standard"
+            value={desc}
+            onChange={(e) => {
+              setDesc(e.target.value);
+              setDescError(false);
+            }}
+            required
+            error={descError}
+            helperText={descError ? 'required' : ''}
+          />
+          <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <DesktopDatePicker
+              label="Deadline"
+              inputFormat="MM/DD/YYYY"
+              value={dayjs(deadline)}
+              onChange={handleDeadlineChange}
+              renderInput={(params) => <TextField {...params} />}
+            />
+          </LocalizationProvider>
+          <FormControl>
+            <FormLabel id="priority-label">Priority</FormLabel>
+            <RadioGroup
+              row
+              aria-labelledby="priority-label"
+              name="row-radio-buttons-group"
+              defaultValue={priority}
+              value={priority}
+              onChange={(e) => setPriority(e.target.value)}
+            >
+              <FormControlLabel value="low" control={<Radio />} label="Low" />
+              <FormControlLabel
+                value="medium"
+                control={<Radio />}
+                label="Medium"
+              />
+              <FormControlLabel value="high" control={<Radio />} label="High" />
+            </RadioGroup>
+          </FormControl>
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button
+          startIcon={<AddCircleRoundedIcon />}
+          onClick={handleSubmitCloseDialog}
+        >
+          Add
+        </Button>
+        <Button startIcon={<BlockIcon />} onClick={handleCloseDialog}>
+          Cancel
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
