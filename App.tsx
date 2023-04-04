@@ -498,3 +498,18 @@ export default function App() {
     </Box>
   );
 }
+
+interface ReusableDialogProps {
+  task: Task;
+  openDialog: boolean;
+  setOpenDialog: (openDialog: boolean) => void;
+}
+
+const defaultTask: Task = {
+  title: '',
+  description: '',
+  deadline: dayjs().add(1, 'day').toJSON(),
+  priority: 'low',
+  isComplete: false,
+  action: ['update', 'delete'],
+};
