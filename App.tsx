@@ -58,66 +58,42 @@ const defaultTask: Task = {
   action: ['update', 'delete'],
 };
 
-// components
-interface UpdateDialogProps {
-  task: Task;
-}
-
-function ActionField({ task }: UpdateDialogProps) {
-  const [openDialog, setOpenDialog] = React.useState<boolean>(false);
-  const dispatch = useDispatch();
-  const hasUpdate = task.action.indexOf('update') !== -1;
-
-  const handleClickOpen = () => {
-    setOpenDialog(true);
-  };
-
-  if (hasUpdate) {
-    return (
-      <Stack spacing={1}>
-        <Button startIcon={<EditOutlinedIcon />} onClick={handleClickOpen}>
-          Update
-        </Button>
-        <ReusableDialog
-          task={task}
-          openDialog={openDialog}
-          setOpenDialog={setOpenDialog}
-          isAdd={false}
-        />
-        <Button
-          startIcon={<HighlightOffRoundedIcon />}
-          onClick={(e) => dispatch(deleteTask(task))}
-        >
-          Delete
-        </Button>
-      </Stack>
-    );
-  } else
-    return (
-      <Stack spacing={1}>
-        <Button
-          startIcon={<HighlightOffRoundedIcon />}
-          onClick={(e) => dispatch(deleteTask(task))}
-        >
-          Delete
-        </Button>
-      </Stack>
-    );
-}
-
 export default function App() {
   // Dialog States
   const [openDialog, setOpenDialog] = React.useState<boolean>(false);
+  const [openUpdateDialog, setOpenUpdateDialog] =
+    React.useState<boolean>(false);
 
+  // Snackbar (toaster)
+  const [snackbar, setSnackbar] = React.useState(false);
+  const [deleteSnackbar, setDeleteSnackbar] = React.useState(false);
   // redux state management
   const tasks = useSelector((state: RootState) => state.tasks.tasks);
   const dispatch = useDispatch();
 
-  // Snackbar (toaster)
-  const [snackbar, setSnackbar] = React.useState(false);
-
   const handleClickOpenDialog = () => {
     setOpenDialog(true);
+  };
+
+  const handleClickUpdateOpen = () => {
+    setOpenUpdateDialog(true);
+  };
+
+  const handleDelSnackbarClose = (
+    event: React.SyntheticEvent | Event,
+    reason?: string
+  ) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+    setDeleteSnackbar(false);
+  };
+
+  const displayDelSnackbar = () => {
+    setDeleteSnackbar(true);
+    setTimeout(() => {
+      setDeleteSnackbar(false); // set the open state to false after 2 seconds
+    }, 2000);
   };
 
   const handleSnackbarClose = (
@@ -130,19 +106,6 @@ export default function App() {
 
     setSnackbar(false);
   };
-
-  const snackbarAction = (
-    <React.Fragment>
-      <IconButton
-        size="small"
-        aria-label="close"
-        color="inherit"
-        onClick={handleSnackbarClose}
-      >
-        <CloseIcon fontSize="small" />
-      </IconButton>
-    </React.Fragment>
-  );
 
   // Rendering
   return (
@@ -229,7 +192,37 @@ export default function App() {
                 </TableCell>
                 <TableCell>
                   <Stack spacing={1}>
-                    <ActionField task={task} />
+                    <div>
+                      <Stack spacing={1}>
+                        {task.action.indexOf('update') !== -1 ? (
+                          <div>
+                            <Button
+                              startIcon={<EditOutlinedIcon />}
+                              onClick={handleClickUpdateOpen}
+                            >
+                              Update
+                            </Button>
+                            <ReusableDialog
+                              task={task}
+                              openDialog={openUpdateDialog}
+                              setOpenDialog={setOpenUpdateDialog}
+                              isAdd={false}
+                            />
+                          </div>
+                        ) : (
+                          ''
+                        )}
+                        <Button
+                          startIcon={<HighlightOffRoundedIcon />}
+                          onClick={(e) => {
+                            dispatch(deleteTask(task));
+                            displayDelSnackbar();
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </Stack>
+                    </div>
                   </Stack>
                 </TableCell>
               </TableRow>
@@ -237,18 +230,17 @@ export default function App() {
           </TableBody>
         </Table>
       </TableContainer>
-      {/* snackbar success view */}
       <Snackbar
-        open={snackbar}
+        open={deleteSnackbar}
         autoHideDuration={2000}
-        message="Successfully added"
+        message="Successfully deleted"
       >
         <Alert
-          onClose={handleSnackbarClose}
+          onClose={handleDelSnackbarClose}
           severity="success"
           sx={{ width: '100%' }}
         >
-          Task successfully added!
+          Task successfully deleted!
         </Alert>
       </Snackbar>
     </Box>
@@ -281,6 +273,7 @@ function ReusableDialog({
 
   // Snackbar (toaster)
   const [snackbar, setSnackbar] = React.useState(false);
+  const [dlSnackbar, setdlSnackbar] = React.useState(false);
 
   // form dialog functions
   const resetInputs = () => {
@@ -295,8 +288,16 @@ function ReusableDialog({
     setOpenDialog(false);
   };
 
+  const isEmpty = (str: string) => {
+    if (str.length === 0 || str.replace(/[\s\r\n\t]+/g, '').length === 0) {
+      return true;
+    } else {
+      return false;
+    }
+  };
+
   const handleSubmitCloseDialog = () => {
-    if (title.length > 0 && desc.length > 0) {
+    if (!isEmpty(title) && !isEmpty(desc)) {
       const newTask: Task = {
         title: title,
         description: desc,
@@ -317,12 +318,30 @@ function ReusableDialog({
         setSnackbar(false); // set the open state to false after 2 seconds
       }, 2000);
     }
-    if (title === '') {
+    if (isEmpty(title)) {
       setTitleError(true);
     }
-    if (desc === '') {
+    if (isEmpty(desc)) {
       setDescError(true);
     }
+  };
+
+  const deadlineErr = () => {
+    setdlSnackbar(true);
+    setTimeout(() => {
+      setdlSnackbar(false); // set the open state to false after 2 seconds
+    }, 2000);
+  };
+
+  const handleDLSnackbarClose = (
+    event: React.SyntheticEvent | Event,
+    reason?: string
+  ) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+
+    setdlSnackbar(false);
   };
 
   // need alert for deadline
@@ -330,98 +349,141 @@ function ReusableDialog({
     if (newValue.isAfter(dayjs().add(1, 'day'))) {
       setDeadline(newValue.toISOString());
     } else {
-      // do something
+      deadlineErr();
     }
   };
 
+  const handleSnackbarClose = (
+    event: React.SyntheticEvent | Event,
+    reason?: string
+  ) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+
+    setSnackbar(false);
+  };
+
   return (
-    <Dialog open={openDialog} onClose={handleCloseDialog}>
-      <DialogTitle>
-        <IconButton>
-          {isAdd ? <AddCircleRoundedIcon /> : <EditOutlinedIcon />}
-        </IconButton>
-        {isAdd ? 'Add Task' : 'Edit Task'}
-      </DialogTitle>
-      <DialogContent>
-        <Stack spacing={2}>
-          {isAdd ? (
+    <div>
+      <Dialog open={openDialog} onClose={handleCloseDialog}>
+        <DialogTitle>
+          <IconButton>
+            {isAdd ? <AddCircleRoundedIcon /> : <EditOutlinedIcon />}
+          </IconButton>
+          {isAdd ? 'Add Task' : 'Edit Task'}
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2}>
+            {isAdd ? (
+              <TextField
+                autoFocus
+                margin="normal"
+                id="title"
+                label="Title"
+                type="text"
+                variant="standard"
+                value={title}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  setTitleError(false);
+                }}
+                sx={{ gap: 2 }}
+                required
+                error={titleError}
+                helperText={titleError ? 'required' : ''}
+              />
+            ) : (
+              ''
+            )}
             <TextField
               autoFocus
               margin="normal"
-              id="title"
-              label="Title"
+              id="description"
+              label="Description"
               type="text"
               variant="standard"
-              value={title}
+              value={desc}
               onChange={(e) => {
-                setTitle(e.target.value);
-                setTitleError(false);
+                setDesc(e.target.value);
+                setDescError(false);
               }}
-              sx={{ gap: 2 }}
               required
-              error={titleError}
-              helperText={titleError ? 'required' : ''}
+              error={descError}
+              helperText={descError ? 'required' : ''}
             />
-          ) : (
-            ''
-          )}
-          <TextField
-            autoFocus
-            margin="normal"
-            id="description"
-            label="Description"
-            type="text"
-            variant="standard"
-            value={desc}
-            onChange={(e) => {
-              setDesc(e.target.value);
-              setDescError(false);
-            }}
-            required
-            error={descError}
-            helperText={descError ? 'required' : ''}
-          />
-          <LocalizationProvider dateAdapter={AdapterDayjs}>
-            <DesktopDatePicker
-              label="Deadline"
-              inputFormat="MM/DD/YYYY"
-              value={dayjs(deadline)}
-              onChange={handleDeadlineChange}
-              renderInput={(params) => <TextField {...params} />}
-            />
-          </LocalizationProvider>
-          <FormControl>
-            <FormLabel id="priority-label">Priority</FormLabel>
-            <RadioGroup
-              row
-              aria-labelledby="priority-label"
-              name="row-radio-buttons-group"
-              defaultValue={priority}
-              value={priority}
-              onChange={(e) => setPriority(e.target.value)}
-            >
-              <FormControlLabel value="low" control={<Radio />} label="Low" />
-              <FormControlLabel
-                value="medium"
-                control={<Radio />}
-                label="Medium"
+            <LocalizationProvider dateAdapter={AdapterDayjs}>
+              <DesktopDatePicker
+                label="Deadline"
+                inputFormat="MM/DD/YYYY"
+                value={dayjs(deadline)}
+                onChange={handleDeadlineChange}
+                renderInput={(params) => <TextField {...params} />}
               />
-              <FormControlLabel value="high" control={<Radio />} label="High" />
-            </RadioGroup>
-          </FormControl>
-        </Stack>
-      </DialogContent>
-      <DialogActions>
-        <Button
-          startIcon={isAdd ? <AddCircleRoundedIcon /> : <EditOutlinedIcon />}
-          onClick={handleSubmitCloseDialog}
+            </LocalizationProvider>
+            <FormControl>
+              <FormLabel id="priority-label">Priority</FormLabel>
+              <RadioGroup
+                row
+                aria-labelledby="priority-label"
+                name="row-radio-buttons-group"
+                defaultValue={priority}
+                value={priority}
+                onChange={(e) => setPriority(e.target.value)}
+              >
+                <FormControlLabel value="low" control={<Radio />} label="Low" />
+                <FormControlLabel
+                  value="medium"
+                  control={<Radio />}
+                  label="Medium"
+                />
+                <FormControlLabel
+                  value="high"
+                  control={<Radio />}
+                  label="High"
+                />
+              </RadioGroup>
+            </FormControl>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            startIcon={isAdd ? <AddCircleRoundedIcon /> : <EditOutlinedIcon />}
+            onClick={handleSubmitCloseDialog}
+          >
+            {isAdd ? 'Add' : 'Update'}
+          </Button>
+          <Button startIcon={<BlockIcon />} onClick={handleCloseDialog}>
+            Cancel
+          </Button>
+        </DialogActions>
+        <Snackbar
+          open={dlSnackbar}
+          autoHideDuration={2000}
+          message="Deadline Warning"
         >
-          {isAdd ? 'Add' : 'Update'}
-        </Button>
-        <Button startIcon={<BlockIcon />} onClick={handleCloseDialog}>
-          Cancel
-        </Button>
-      </DialogActions>
-    </Dialog>
+          <Alert
+            onClose={handleDLSnackbarClose}
+            severity="warning"
+            sx={{ width: '100%' }}
+          >
+            Deadline must be at least one day in advance
+          </Alert>
+        </Snackbar>
+      </Dialog>
+      <Snackbar
+        open={snackbar}
+        autoHideDuration={2000}
+        message={isAdd ? 'Successfully added' : 'Successfully updated'}
+      >
+        <Alert
+          onClose={handleSnackbarClose}
+          severity="success"
+          sx={{ width: '100%' }}
+        >
+          {isAdd ? 'Task successfully added!' : 'Task successfully updated!'}
+        </Alert>
+      </Snackbar>
+    </div>
   );
 }
