@@ -52,7 +52,7 @@ import type { RootState } from './app/store';
 const defaultTask: Task = {
   title: '',
   description: '',
-  deadline: dayjs().add(1, 'day').toJSON(),
+  deadline: dayjs().add(1, 'day').toISOString(),
   priority: 'low',
   isComplete: false,
   action: ['update', 'delete'],
@@ -64,49 +64,12 @@ interface UpdateDialogProps {
 }
 
 function ActionField({ task }: UpdateDialogProps) {
-  const [updateTaskDesc, setUpdateTaskDesc] = React.useState(task.description);
-  const [descError, setDescError] = React.useState(false);
-  const [updateTaskDeadline, setUpdateTaskDeadline] = React.useState<string>(
-    task.deadline
-  );
-  const [updateTaskPrty, setUpdateTaskPrty] = React.useState(task.priority);
-
-  const [open, setOpen] = React.useState<boolean>(false);
-
+  const [openDialog, setOpenDialog] = React.useState<boolean>(false);
   const dispatch = useDispatch();
-
   const hasUpdate = task.action.indexOf('update') !== -1;
 
   const handleClickOpen = () => {
-    setOpen(true);
-  };
-
-  const handleClose = () => {
-    setOpen(false);
-  };
-
-  const handleSubmitClose = () => {
-    if (updateTaskDesc === '') {
-      setDescError(true);
-    }
-    const newTask: Task = {
-      title: task.title,
-      description: updateTaskDesc,
-      deadline: updateTaskDeadline,
-      priority: updateTaskPrty,
-      isComplete: task.isComplete,
-      action: task.action,
-    };
-    dispatch(updateTask(newTask));
-    setOpen(false);
-  };
-
-  const handleDeadlineChange = (newValue: Dayjs | null) => {
-    if (newValue.isAfter(dayjs().add(1, 'day'))) {
-      setUpdateTaskDeadline(newValue.toJSON());
-    } else {
-      console.log('invalid deadline');
-    }
+    setOpenDialog(true);
   };
 
   if (hasUpdate) {
@@ -115,82 +78,12 @@ function ActionField({ task }: UpdateDialogProps) {
         <Button startIcon={<EditOutlinedIcon />} onClick={handleClickOpen}>
           Update
         </Button>
-        {/* Update Dialog Form */}
-        <Dialog open={open} onClose={handleClose}>
-          <DialogTitle>
-            <IconButton>
-              <EditOutlinedIcon />
-            </IconButton>
-            Edit Task
-          </DialogTitle>
-          <DialogContent>
-            <Stack spacing={2}>
-              <TextField
-                autoFocus
-                margin="normal"
-                id="description"
-                label="Description"
-                type="text"
-                variant="standard"
-                value={updateTaskDesc}
-                onChange={(e) => {
-                  setUpdateTaskDesc(e.target.value);
-                  setDescError(false);
-                }}
-                required
-                error={descError}
-                helperText={descError ? 'required' : ''}
-              />
-              <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <DesktopDatePicker
-                  label="Deadline"
-                  inputFormat="MM/DD/YYYY"
-                  value={dayjs(updateTaskDeadline)}
-                  onChange={handleDeadlineChange}
-                  renderInput={(params) => <TextField {...params} />}
-                />
-              </LocalizationProvider>
-              <FormControl>
-                <FormLabel id="priority-label">Priority</FormLabel>
-                <RadioGroup
-                  row
-                  aria-labelledby="priority-label"
-                  name="row-radio-buttons-group"
-                  defaultValue={updateTaskPrty}
-                  value={updateTaskPrty}
-                  onChange={(e) => setUpdateTaskPrty(e.target.value)}
-                >
-                  <FormControlLabel
-                    value="low"
-                    control={<Radio />}
-                    label="Low"
-                  />
-                  <FormControlLabel
-                    value="medium"
-                    control={<Radio />}
-                    label="Medium"
-                  />
-                  <FormControlLabel
-                    value="high"
-                    control={<Radio />}
-                    label="High"
-                  />
-                </RadioGroup>
-              </FormControl>
-            </Stack>
-          </DialogContent>
-          <DialogActions>
-            <Button
-              startIcon={<EditOutlinedIcon />}
-              onClick={handleSubmitClose}
-            >
-              Update
-            </Button>
-            <Button startIcon={<BlockIcon />} onClick={handleClose}>
-              Cancel
-            </Button>
-          </DialogActions>
-        </Dialog>
+        <ReusableDialog
+          task={task}
+          openDialog={openDialog}
+          setOpenDialog={setOpenDialog}
+          isAdd={false}
+        />
         <Button
           startIcon={<HighlightOffRoundedIcon />}
           onClick={(e) => dispatch(deleteTask(task))}
@@ -393,7 +286,7 @@ function ReusableDialog({
   const resetInputs = () => {
     setTitle('');
     setDesc('');
-    setDeadline(dayjs());
+    setDeadline(dayjs().add(1, 'day').toISOString());
     setPriority('low');
   };
 
@@ -412,7 +305,9 @@ function ReusableDialog({
         isComplete: task.isComplete,
         action: task.action,
       };
-      if (isAdd) {
+      if (!isAdd) {
+        dispatch(updateTask(newTask));
+      } else {
         dispatch(addTask(newTask));
         resetInputs();
       }
@@ -433,7 +328,7 @@ function ReusableDialog({
   // need alert for deadline
   const handleDeadlineChange = (newValue: Dayjs | null) => {
     if (newValue.isAfter(dayjs().add(1, 'day'))) {
-      setDeadline(newValue.toJSON());
+      setDeadline(newValue.toISOString());
     } else {
       // do something
     }
@@ -443,29 +338,33 @@ function ReusableDialog({
     <Dialog open={openDialog} onClose={handleCloseDialog}>
       <DialogTitle>
         <IconButton>
-          <AddCircleRoundedIcon />
+          {isAdd ? <AddCircleRoundedIcon /> : <EditOutlinedIcon />}
         </IconButton>
-        Add Task
+        {isAdd ? 'Add Task' : 'Edit Task'}
       </DialogTitle>
       <DialogContent>
         <Stack spacing={2}>
-          <TextField
-            autoFocus
-            margin="normal"
-            id="title"
-            label="Title"
-            type="text"
-            variant="standard"
-            value={title}
-            onChange={(e) => {
-              setTitle(e.target.value);
-              setTitleError(false);
-            }}
-            sx={{ gap: 2 }}
-            required
-            error={titleError}
-            helperText={titleError ? 'required' : ''}
-          />
+          {isAdd ? (
+            <TextField
+              autoFocus
+              margin="normal"
+              id="title"
+              label="Title"
+              type="text"
+              variant="standard"
+              value={title}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                setTitleError(false);
+              }}
+              sx={{ gap: 2 }}
+              required
+              error={titleError}
+              helperText={titleError ? 'required' : ''}
+            />
+          ) : (
+            ''
+          )}
           <TextField
             autoFocus
             margin="normal"
@@ -514,10 +413,10 @@ function ReusableDialog({
       </DialogContent>
       <DialogActions>
         <Button
-          startIcon={<AddCircleRoundedIcon />}
+          startIcon={isAdd ? <AddCircleRoundedIcon /> : <EditOutlinedIcon />}
           onClick={handleSubmitCloseDialog}
         >
-          Add
+          {isAdd ? 'Add' : 'Update'}
         </Button>
         <Button startIcon={<BlockIcon />} onClick={handleCloseDialog}>
           Cancel
