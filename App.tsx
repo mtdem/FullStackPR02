@@ -134,6 +134,7 @@ export default function App() {
             Add
           </Button>
           <ReusableDialog
+            tasks={tasks}
             task={defaultTask}
             openDialog={openDialog}
             setOpenDialog={setOpenDialog}
@@ -203,6 +204,7 @@ export default function App() {
                               Update
                             </Button>
                             <ReusableDialog
+                              tasks={tasks}
                               task={task}
                               openDialog={openUpdateDialog}
                               setOpenDialog={setOpenUpdateDialog}
@@ -248,6 +250,7 @@ export default function App() {
 }
 
 interface ReusableDialogProps {
+  tasks: Task[];
   task: Task;
   openDialog: boolean;
   setOpenDialog: (openDialog: boolean) => void;
@@ -255,6 +258,7 @@ interface ReusableDialogProps {
 }
 
 function ReusableDialog({
+  tasks,
   task,
   openDialog,
   setOpenDialog,
@@ -266,14 +270,15 @@ function ReusableDialog({
   const [deadline, setDeadline] = React.useState<string>(task.deadline);
   const [priority, setPriority] = React.useState(task.priority);
 
-  const [titleError, setTitleError] = React.useState(true);
-  const [descError, setDescError] = React.useState(true);
+  const [titleError, setTitleError] = React.useState(false);
+  const [descError, setDescError] = React.useState(false);
 
   const dispatch = useDispatch();
 
   // Snackbar (toaster)
   const [snackbar, setSnackbar] = React.useState(false);
   const [dlSnackbar, setdlSnackbar] = React.useState(false);
+  const [dupSnackbar, setDupSnackbar] = React.useState(false);
 
   // form dialog functions
   const resetInputs = () => {
@@ -306,24 +311,39 @@ function ReusableDialog({
         isComplete: task.isComplete,
         action: task.action,
       };
+
       if (!isAdd) {
         dispatch(updateTask(newTask));
+        successRes();
+        setOpenDialog(false);
       } else {
-        dispatch(addTask(newTask));
-        resetInputs();
+        const hasDuplicate = tasks.some(
+          (task: Task) => task.title === newTask.title
+        );
+        if (hasDuplicate) {
+          dupErr();
+          resetInputs();
+          setTitleError(true);
+          setDescError(true);
+        } else {
+          dispatch(addTask(newTask));
+          resetInputs();
+          successRes();
+          setOpenDialog(false);
+        }
       }
-      setOpenDialog(false);
-      setSnackbar(true);
-      setTimeout(() => {
-        setSnackbar(false); // set the open state to false after 2 seconds
-      }, 2000);
-    }
-    if (isEmpty(title)) {
+    } else {
+      resetInputs();
       setTitleError(true);
-    }
-    if (isEmpty(desc)) {
       setDescError(true);
     }
+  };
+
+  const successRes = () => {
+    setSnackbar(true);
+    setTimeout(() => {
+      setSnackbar(false); // set the open state to false after 2 seconds
+    }, 2000);
   };
 
   const deadlineErr = () => {
@@ -331,6 +351,24 @@ function ReusableDialog({
     setTimeout(() => {
       setdlSnackbar(false); // set the open state to false after 2 seconds
     }, 2000);
+  };
+
+  const dupErr = () => {
+    setDupSnackbar(true);
+    setTimeout(() => {
+      setDupSnackbar(false);
+    }, 2000);
+  };
+
+  const handleSnackbarClose = (
+    event: React.SyntheticEvent | Event,
+    reason?: string
+  ) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+
+    setSnackbar(false);
   };
 
   const handleDLSnackbarClose = (
@@ -344,16 +382,7 @@ function ReusableDialog({
     setdlSnackbar(false);
   };
 
-  // need alert for deadline
-  const handleDeadlineChange = (newValue: Dayjs | null) => {
-    if (newValue.isAfter(dayjs().add(1, 'day'))) {
-      setDeadline(newValue.toISOString());
-    } else {
-      deadlineErr();
-    }
-  };
-
-  const handleSnackbarClose = (
+  const handleDupSnackbarClose = (
     event: React.SyntheticEvent | Event,
     reason?: string
   ) => {
@@ -361,7 +390,16 @@ function ReusableDialog({
       return;
     }
 
-    setSnackbar(false);
+    setDupSnackbar(false);
+  };
+
+  // need alert for deadline
+  const handleDeadlineChange = (newValue: Dayjs | null) => {
+    if (newValue.isAfter(dayjs().add(1, 'day'))) {
+      setDeadline(newValue.toISOString());
+    } else {
+      deadlineErr();
+    }
   };
 
   return (
@@ -472,16 +510,29 @@ function ReusableDialog({
         </Snackbar>
       </Dialog>
       <Snackbar
+        open={dupSnackbar}
+        autoHideDuration={2000}
+        message="Duplicate Task"
+      >
+        <Alert
+          onClose={handleDupSnackbarClose}
+          severity="error"
+          sx={{ width: '100%' }}
+        >
+          Cannot have a task with the same title
+        </Alert>
+      </Snackbar>
+      <Snackbar
         open={snackbar}
         autoHideDuration={2000}
-        message={isAdd ? 'Successfully added' : 'Successfully updated'}
+        message={isAdd ? 'Successfully Added' : 'Successfully Updated'}
       >
         <Alert
           onClose={handleSnackbarClose}
           severity="success"
           sx={{ width: '100%' }}
         >
-          {isAdd ? 'Task successfully added!' : 'Task successfully updated!'}
+          {isAdd ? 'Task successfully added!' : 'Task succesfully updated!'}
         </Alert>
       </Snackbar>
     </div>
